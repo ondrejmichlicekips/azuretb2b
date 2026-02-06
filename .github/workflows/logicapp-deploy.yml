@@ -40,6 +40,8 @@ jobs:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
           pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+        shell: powershell
+
 
       - name: Repack package
         run: |
@@ -80,6 +82,7 @@ jobs:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
           pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+        shell: powershell
 
       - name: Repack package
         run: |
@@ -120,6 +123,7 @@ jobs:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
           pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+        shell: powershell
 
       - name: Repack package
         run: |
