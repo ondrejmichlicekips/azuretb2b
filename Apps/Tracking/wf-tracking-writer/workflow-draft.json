@@ -1,0 +1,162 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-message-tracking"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus-5",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "Upload_Body_to_blob_storage_container": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "blobUri": "bodies/@{body('MessageContext')?['MessageId']}",
+            "content": "@base64ToBinary(body('Parse_msg_JSON')?['Body'])"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob",
+            "operationId": "uploadBlobFromUri",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "Upload_Context_to_blob_storage_container": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Parse_msg_JSON": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "Context": {
+                "type": "object"
+              },
+              "Body": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Upload_Context_to_blob_storage_container": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "blobUri": "messages/@{body('MessageContext')?['MessageId']}",
+            "content": "@body('Parse_msg_JSON')?['Context']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "AzureBlob",
+            "operationId": "uploadBlobFromUri",
+            "serviceProviderId": "/serviceProviders/AzureBlob"
+          }
+        },
+        "runAfter": {
+          "MessageContext": [
+            "Succeeded"
+          ]
+        }
+      },
+      "MessageContext": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@body('Parse_msg_JSON')?['Context']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "Context": {
+                "type": "object",
+                "properties": {
+                  "CorrelationId": {
+                    "type": "string"
+                  },
+                  "EventId": {
+                    "type": "string"
+                  },
+                  "MessageId": {
+                    "type": "string"
+                  },
+                  "ParentId": {
+                    "type": "string"
+                  },
+                  "Date": {
+                    "type": "string"
+                  },
+                  "SourceParty": {
+                    "type": "string"
+                  },
+                  "SourcePartyId": {
+                    "type": "string"
+                  },
+                  "DestinationParty": {
+                    "type": "string"
+                  },
+                  "DestinationPartyId": {
+                    "type": "string"
+                  },
+                  "MessageType": {
+                    "type": "string"
+                  },
+                  "Routing": {
+                    "type": "string"
+                  },
+                  "Stage": {
+                    "type": "string"
+                  }
+                }
+              },
+              "Body": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Parse_msg_JSON": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-message-tracking",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus-5",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Upload_Body_to_blob_storage_container": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

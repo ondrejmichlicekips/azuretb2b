@@ -1,0 +1,121 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {}
+    },
+    "actions": {
+      "Parse_JSON_MainMessage": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "",
+          "schema": ""
+        },
+        "runAfter": {}
+      },
+      "Condition": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "",
+                ""
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Set_AuthorizationHeader_OAuth": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": ""
+            },
+            "runAfter": {
+              "Parse_AccessToken": [
+                "Succeeded"
+              ]
+            }
+          },
+          "HTTP_GetToken": {
+            "type": "Http",
+            "inputs": {
+              "uri": "",
+              "method": ""
+            }
+          },
+          "Parse_AccessToken": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "",
+              "schema": ""
+            },
+            "runAfter": {
+              "HTTP_GetToken": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Set_AuthorizationHeader_Basic": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": ""
+              },
+              "runAfter": {
+                "AuthCredential_to_Base64Encode": [
+                  "Succeeded"
+                ]
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Initialize_variables_UserName": [
+            "Succeeded"
+          ]
+        }
+      },
+      "HTTP_UploadMessage": {
+        "type": "Http",
+        "inputs": {
+          "uri": "",
+          "method": ""
+        },
+        "runAfter": {
+          "Condition": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Initialize_variables": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": ""
+        },
+        "runAfter": {
+          "DataDecoded": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Initialize_variables_UserName": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": ""
+        },
+        "runAfter": {
+          "Execute_query_Load_HTTP_info": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

@@ -1,0 +1,12 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "actions": {},
+    "outputs": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {}
+    }
+  },
+  "kind": "stateful"
+}

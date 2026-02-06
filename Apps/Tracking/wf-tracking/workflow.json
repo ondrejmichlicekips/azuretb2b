@@ -1,0 +1,512 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_events_are_available_in_Event_hub": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "eventHubName": "insights"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "eventHub",
+            "operationId": "receiveEvents",
+            "serviceProviderId": "/serviceProviders/eventHub"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "Execute_JavaScript_code": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "let output = [];\r\nlet processedItems = [];\r\n\r\nconst content = workflowContext.trigger.outputs.body.contentData;\r\nconst data = JSON.parse(content);\r\n\r\n//const data = JSON.parse(workflowContext.actions.EventBody.inputs.variables[0].value);\r\n\r\nfor (const record of data.records.sort((a,b) => b.time - a.time)) {\r\n    //try {\r\n        // skip duplicit items (trigger lock)\r\n        let itemKey = record.OperationName + record.Name;\r\n        if (processedItems.includes(itemKey))\r\n          continue;\r\n        processedItems.push(itemKey);\r\n\r\n        if (!record.resourceId)\r\n            continue;\r\n        let parts = record.resourceId.split('/');\r\n        if (parts.length < 4) {\r\n            continue;\r\n        }\r\n\r\n        /// TODO: add error handling\r\n\r\n        const time = record.time;\r\n        const type = record.Type;\r\n        const subscription = parts[2];\r\n        const resourceGroup = parts[4];\r\n        const appRoleName = record.AppRoleName;\r\n        const operationName = record.Name;\r\n        const category = record.Properties.Category.split('.')[2];\r\n        const logLevel = record.Properties.LogLevel;\r\n         \r\n        let trackedProperties = [];\r\n        if (record.Properties.trackedProperties) {            \r\n            let properties = JSON.parse(record.Properties.trackedProperties);\r\n\r\n            Object.keys(properties).forEach(function (key) {\r\n                let value = properties[key].toString();\r\n                trackedProperties.push( {key, value } );\r\n            });\r\n\r\n            /*\r\n            for (const p in properties) {\r\n                for (const key of Object.keys(p)) {\r\n                    let value = p[key];\r\n                    trackedProperties.push( {key, value } );\r\n                }\r\n            }\r\n            //*/\r\n        }\r\n\r\n        let url = \"\";\r\n        if (logLevel == \"Error\") {\r\n            url = record.Url;\r\n        }\r\n\r\n        let runId =\"\";\r\n        let workflowName = \"\";\r\n        if (record.Properties.resource) {\r\n            const resource = JSON.parse(record.Properties.resource);\r\n            runId = resource.runId;\r\n            workflowName = resource.workflowName;\r\n            //operationName = record.actionName;\r\n            //operationName = record.triggerName;\r\n        }\r\n\r\n        if (!workflowName) {\r\n           continue;\r\n        }\r\n        if (workflowName == 'wf-routing') {\r\n           continue;\r\n        }\r\n        if (logLevel == \"Error\") {\r\n           continue;\r\n        }\r\n\r\n        if (//category == 'Triggers' || \r\n        (operationName && operationName.includes('Send_message'))) {\r\n            output.push(\r\n                {time, logLevel, subscription, resourceGroup, appRoleName, workflowName, operationName, category, runId, url, trackedProperties }\r\n            );\r\n        }\r\n\r\n    //} catch (e) { }\r\n}\r\nreturn output;"
+        },
+        "runAfter": {}
+      },
+      "For_each_track_record": {
+        "type": "Foreach",
+        "foreach": "@outputs('Execute_JavaScript_code')",
+        "actions": {
+          "Parse_JSON": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "@items('For_each_track_record')",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "time": {
+                    "type": "string"
+                  },
+                  "logLevel": {
+                    "type": "string"
+                  },
+                  "subscription": {
+                    "type": "string"
+                  },
+                  "resourceGroup": {
+                    "type": "string"
+                  },
+                  "appRoleName": {
+                    "type": "string"
+                  },
+                  "workflowName": {
+                    "type": "string"
+                  },
+                  "operationName": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "runId": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "trackedProperties": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "Condition_No_Error_Url": {
+            "type": "If",
+            "expression": {
+              "and": [
+                {
+                  "not": {
+                    "equals": [
+                      "@body('Parse_JSON')?['logLevel']",
+                      "Error"
+                    ]
+                  }
+                }
+              ]
+            },
+            "actions": {
+              "Condition_Trigger_or_Action": {
+                "type": "If",
+                "expression": {
+                  "and": [
+                    {
+                      "equals": [
+                        "@body('Parse_JSON')?['category']",
+                        "Triggers"
+                      ]
+                    }
+                  ]
+                },
+                "actions": {
+                  "Call_Triggers_Histories": {
+                    "type": "Http",
+                    "inputs": {
+                      "uri": "https://management.azure.com/subscriptions/@{body('Parse_JSON')?['subscription']}/resourceGroups/@{body('Parse_JSON')?['resourceGroup']}/providers/Microsoft.Web/sites/@{body('Parse_JSON')?['appRoleName']}/hostruntime/runtime/webhooks/workflow/api/management/workflows/@{body('Parse_JSON')?['workflowName']}/triggers/@{body('Parse_JSON')?['operationName']}/histories/@{body('Parse_JSON')?['runId']}?api-version=2024-11-01",
+                      "method": "GET",
+                      "authentication": {
+                        "type": "ManagedServiceIdentity",
+                        "audience": ""
+                      }
+                    },
+                    "runtimeConfiguration": {
+                      "contentTransfer": {
+                        "transferMode": "Chunked"
+                      }
+                    }
+                  },
+                  "GET_URI": {
+                    "type": "ParseJson",
+                    "inputs": {
+                      "content": "@body('Call_Triggers_Histories')",
+                      "schema": {
+                        "type": "object",
+                        "properties": {
+                          "properties": {
+                            "type": "object",
+                            "properties": {
+                              "startTime": {
+                                "type": "string"
+                              },
+                              "endTime": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "correlation": {
+                                "type": "object",
+                                "properties": {
+                                  "clientTrackingId": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "inputsLink": {
+                                "type": "object",
+                                "properties": {
+                                  "uri": {
+                                    "type": "string"
+                                  },
+                                  "contentSize": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "outputsLink": {
+                                "type": "object",
+                                "properties": {
+                                  "uri": {
+                                    "type": "string"
+                                  },
+                                  "contentSize": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "fired": {
+                                "type": "boolean"
+                              },
+                              "run": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "workflow": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "runAfter": {
+                      "Call_Triggers_Histories": [
+                        "Succeeded"
+                      ]
+                    }
+                  },
+                  "Get_Output": {
+                    "type": "Http",
+                    "inputs": {
+                      "uri": "@body('GET_URI')?['properties']?['outputsLink']?['uri']\r\n",
+                      "method": "GET"
+                    },
+                    "runAfter": {
+                      "GET_URI": [
+                        "Succeeded"
+                      ]
+                    },
+                    "operationOptions": "DisableAsyncPattern",
+                    "runtimeConfiguration": {
+                      "contentTransfer": {
+                        "transferMode": "Chunked"
+                      }
+                    }
+                  },
+                  "Set_Body_from_Trigger": {
+                    "type": "JavaScriptCode",
+                    "inputs": {
+                      "code": "const body = workflowContext.actions.Get_Output.outputs.body.body;\r\n\r\nlet items = [];\r\nif (Array.isArray(body)) {\r\n    items = body;\r\n}\r\nelse {\r\n    items.push(body);\r\n}\r\n\r\nlet output = [];\r\nfor (const item of items) {\r\n    const jsonStr = item.contentData;\r\n    \r\n    const msg = JSON.parse(jsonStr);\r\n    output.push(msg);\r\n}\r\n\r\n//workflowContext.actions.Body.inputs.variables[0].value = output;\r\n \r\nreturn output;\r\n"
+                    },
+                    "runAfter": {
+                      "Get_Output": [
+                        "Succeeded"
+                      ]
+                    }
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Call_Actions_Histories": {
+                      "type": "Http",
+                      "inputs": {
+                        "uri": "https://management.azure.com/subscriptions/@{body('Parse_JSON')?['subscription']}/resourceGroups/@{body('Parse_JSON')?['resourceGroup']}/providers/Microsoft.Web/sites/@{body('Parse_JSON')?['appRoleName']}/hostruntime/runtime/webhooks/workflow/api/management/workflows/@{body('Parse_JSON')?['workflowName']}/runs/@{body('Parse_JSON')?['runId']}/actions/@{body('Parse_JSON')?['operationName']}?api-version=2024-11-01",
+                        "method": "GET",
+                        "authentication": {
+                          "type": "ManagedServiceIdentity",
+                          "audience": ""
+                        }
+                      },
+                      "runtimeConfiguration": {
+                        "contentTransfer": {
+                          "transferMode": "Chunked"
+                        }
+                      }
+                    },
+                    "GET_action_URI": {
+                      "type": "ParseJson",
+                      "inputs": {
+                        "content": "@body('Call_Actions_Histories')",
+                        "schema": {
+                          "type": "object",
+                          "properties": {
+                            "properties": {
+                              "type": "object",
+                              "properties": {
+                                "startTime": {
+                                  "type": "string"
+                                },
+                                "endTime": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                },
+                                "correlation": {
+                                  "type": "object",
+                                  "properties": {
+                                    "clientTrackingId": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "inputsLink": {
+                                  "type": "object",
+                                  "properties": {
+                                    "uri": {
+                                      "type": "string"
+                                    },
+                                    "contentSize": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                },
+                                "outputsLink": {
+                                  "type": "object",
+                                  "properties": {
+                                    "uri": {
+                                      "type": "string"
+                                    },
+                                    "contentSize": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                },
+                                "fired": {
+                                  "type": "boolean"
+                                },
+                                "run": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "workflow": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Call_Actions_Histories": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Get_Action_Output": {
+                      "type": "Http",
+                      "inputs": {
+                        "uri": "@body('GET_action_URI')?['properties']?['outputsLink']?['uri']\r\n",
+                        "method": "GET"
+                      },
+                      "runAfter": {
+                        "Get_Action_Input": [
+                          "Succeeded"
+                        ]
+                      },
+                      "operationOptions": "DisableAsyncPattern",
+                      "runtimeConfiguration": {
+                        "contentTransfer": {
+                          "transferMode": "Chunked"
+                        }
+                      }
+                    },
+                    "Get_Action_Input": {
+                      "type": "Http",
+                      "inputs": {
+                        "uri": "@body('GET_action_URI')?['properties']?['inputsLink']?['uri']",
+                        "method": "GET"
+                      },
+                      "runAfter": {
+                        "GET_action_URI": [
+                          "Succeeded"
+                        ]
+                      },
+                      "operationOptions": "DisableAsyncPattern",
+                      "runtimeConfiguration": {
+                        "contentTransfer": {
+                          "transferMode": "Chunked"
+                        }
+                      }
+                    },
+                    "Set_Body_from_Action": {
+                      "type": "JavaScriptCode",
+                      "inputs": {
+                        "code": "const body = workflowContext.actions.Get_Action_Input.outputs.body.parameters.message;\r\n\r\nlet output = [];\r\noutput.push(body.contentData);\r\n\r\n//workflowContext.actions.Body.inputs.variables[0].value = output;\r\n\r\nreturn output;"
+                      },
+                      "runAfter": {
+                        "Get_Action_Output": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "Parse_trace_data": {
+                "type": "JavaScriptCode",
+                "inputs": {
+                  "code": "\r\nlet trackedProperties = workflowContext.actions.Parse_JSON.outputs.body.trackedProperties;\r\n\r\nlet workflowName = workflowContext.actions.Parse_JSON.outputs.body.workflowName;\r\n\r\nlet operationName = workflowContext.actions.Parse_JSON.outputs.body.operationName;\r\n\r\n\r\n//let items = workflowContext.actions.Body.inputs.variables[0].value;\r\nlet items = []\r\nif (workflowContext.actions.Parse_JSON.outputs.body.category == 'Triggers') {\r\n    items = workflowContext.actions.Set_Body_from_Trigger.outputs;\r\n} else {\r\n    items = workflowContext.actions.Set_Body_from_Action.outputs;\r\n}\r\n\r\nlet output = [];\r\n\r\nfor (const msg of items) {\r\n    msg.Context.workflowName = workflowName;\r\n    msg.Context.operationName = operationName;\r\n\r\n    for (const property of trackedProperties) {\r\n        msg.Context[property.key] = property.value;\r\n    }\r\n\r\n    output.push(msg)    \r\n}\r\n\r\nreturn output;\r\n\r\n"
+                },
+                "runAfter": {
+                  "Condition_Trigger_or_Action": [
+                    "Succeeded"
+                  ]
+                }
+              },
+              "For_each_parsed_context": {
+                "type": "Foreach",
+                "foreach": "@outputs('Parse_trace_data')",
+                "actions": {
+                  "Send_message": {
+                    "type": "ServiceProvider",
+                    "inputs": {
+                      "parameters": {
+                        "entityName": "sbq-message-tracking",
+                        "message": {
+                          "contentData": "@items('For_each_parsed_context')"
+                        }
+                      },
+                      "serviceProviderConfiguration": {
+                        "connectionName": "serviceBus-5",
+                        "operationId": "sendMessage",
+                        "serviceProviderId": "/serviceProviders/serviceBus"
+                      }
+                    }
+                  }
+                },
+                "runAfter": {
+                  "Parse_trace_data": [
+                    "Succeeded"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {
+                "Call_Error_Url": {
+                  "type": "Http",
+                  "inputs": {
+                    "uri": "@body('Parse_JSON')?['url']",
+                    "method": "GET",
+                    "authentication": {
+                      "type": "ManagedServiceIdentity",
+                      "audience": ""
+                    }
+                  },
+                  "runtimeConfiguration": {
+                    "contentTransfer": {
+                      "transferMode": "Chunked"
+                    }
+                  }
+                }
+              }
+            },
+            "runAfter": {
+              "Parse_JSON": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Body": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Body": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "Body",
+              "type": "array",
+              "value": []
+            }
+          ]
+        },
+        "runAfter": {
+          "Execute_JavaScript_code": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

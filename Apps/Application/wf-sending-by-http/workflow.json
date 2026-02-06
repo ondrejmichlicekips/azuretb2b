@@ -1,0 +1,338 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-test"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "DataDecoded": {
+        "type": "Compose",
+        "inputs": "@decodeBase64(body('Parse_JSON_MainMessage')['Body'])",
+        "runAfter": {
+          "Parse_JSON_MainMessage": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Parse_JSON_MainMessage": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "Context": {
+                "type": "object",
+                "properties": {
+                  "CorrelationID": {
+                    "type": "string"
+                  },
+                  "Stage": {
+                    "type": "string"
+                  },
+                  "SourceParty": {
+                    "type": "string"
+                  },
+                  "SourcePartyID": {},
+                  "DestinationParty": {
+                    "type": "string"
+                  },
+                  "DestinationPartyID": {},
+                  "MessageType": {
+                    "type": "string"
+                  },
+                  "MessageId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "Body": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Condition": {
+        "type": "If",
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@body('Parse_JSON_MainMessage')?['Context']?['HttpSend']?['OAuthRequested']",
+                true
+              ]
+            }
+          ]
+        },
+        "actions": {
+          "Set_AuthorizationHeader_OAuth": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "AuthorizationHeader",
+              "value": "Bearer @{body('Parse_AccessToken')?['access_token']}"
+            },
+            "runAfter": {
+              "Parse_AccessToken": [
+                "Succeeded"
+              ]
+            }
+          },
+          "HTTP_GetToken": {
+            "type": "Http",
+            "inputs": {
+              "uri": "https://apim-01-tb2bintegation-euw-dev.azure-api.net/@{body('Parse_JSON_MainMessage')?['Context']?['HttpSend']?['TokenInformation']?['APIMEndpoint']}",
+              "method": "POST",
+              "headers": {
+                "Ocp-Apim-Subscription-Key": "5022ad1766994b1892214ba7a3e7692b",
+                "CredentialAPIName": "@{body('Parse_JSON_MainMessage')?['Context']?['HttpSend']?['TokenInformation']?['CredentialAPIName']}",
+                "ConnectionName": "@{variables('UserName')}conn"
+              }
+            },
+            "runtimeConfiguration": {
+              "contentTransfer": {
+                "transferMode": "Chunked"
+              }
+            }
+          },
+          "Parse_AccessToken": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "@body('HTTP_GetToken')",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "access_token": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "runAfter": {
+              "HTTP_GetToken": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "else": {
+          "actions": {
+            "Set_AuthorizationHeader_Basic": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "AuthorizationHeader",
+                "value": "Basic @{outputs('AuthCredential_to_Base64Encode')}"
+              },
+              "runAfter": {
+                "AuthCredential_to_Base64Encode": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "AuthCredential_to_Base64Encode": {
+              "type": "Compose",
+              "inputs": "@base64(concat(variables('UserName'), ':', body('Get_secret')?['value']))",
+              "runAfter": {
+                "Get_secret": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Get_secret": {
+              "type": "ServiceProvider",
+              "inputs": {
+                "parameters": {
+                  "secretName": "@variables('UserName')"
+                },
+                "serviceProviderConfiguration": {
+                  "connectionName": "keyVault",
+                  "operationId": "getSecret",
+                  "serviceProviderId": "/serviceProviders/keyVault"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "runAfter": {
+          "Initialize_variables_UserName": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Initialize_variables": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "AuthorizationHeader",
+              "type": "string",
+              "value": "nothing"
+            }
+          ]
+        },
+        "runAfter": {
+          "DataDecoded": [
+            "Succeeded"
+          ]
+        }
+      },
+      "HTTP_UploadMessage": {
+        "type": "Http",
+        "inputs": {
+          "uri": "@variables('URL')",
+          "method": "POST",
+          "headers": {
+            "Authorization": "@{variables('AuthorizationHeader')}"
+          },
+          "body": "@outputs('DataDecoded')"
+        },
+        "runAfter": {
+          "Condition": [
+            "Succeeded"
+          ]
+        },
+        "runtimeConfiguration": {
+          "contentTransfer": {
+            "transferMode": "Chunked"
+          }
+        }
+      },
+      "Compose_Output_Body": {
+        "type": "Compose",
+        "inputs": "@setProperty(body('Parse_JSON_MainMessage'), 'Body', body('HTTP_UploadMessage'))",
+        "runAfter": {
+          "HTTP_UploadMessage": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_HTTPStatus_": {
+        "type": "Compose",
+        "inputs": "@setProperty(outputs('Compose_Output_Body'), 'HTTPResponseCode', outputs('HTTP_UploadMessage')?['statusCode'])",
+        "runAfter": {
+          "Compose_Output_Body": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Execute_query_Load_HTTP_info": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "query": "select ac.[url], ac.[user_name]\nfrom [dbo].[azure_communications] ac\nwhere ac.sender = '@{body('Parse_JSON_MainMessage')?['Context']?['SourceParty']}' and ac.receiver = '@{body('Parse_JSON_MainMessage')?['Context']?['DestinationParty']}'"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "sql",
+            "operationId": "executeQuery",
+            "serviceProviderId": "/serviceProviders/sql"
+          }
+        },
+        "runAfter": {
+          "Initialize_variables": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Initialize_variables_URL": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "URL",
+              "type": "string",
+              "value": "@{body('Execute_query_Load_HTTP_info')?[0][0]['url']}"
+            }
+          ]
+        },
+        "runAfter": {
+          "Execute_query_Load_HTTP_info": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Initialize_variables_UserName": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "UserName",
+              "type": "string",
+              "value": "@{body('Execute_query_Load_HTTP_info')?[0][0]['user_name']}"
+            }
+          ]
+        },
+        "runAfter": {
+          "Initialize_variables_URL": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Send_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "sbq-json-to-xml-transform",
+            "message": {
+              "contentData": "@outputs('Compose_Output_Body')"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "sendMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Compose_HTTPStatus_": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-test",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Send_message": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

@@ -1,0 +1,144 @@
+name: Deploy Logic App Standard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Apps/Application/**"
+      - ".github/workflows/logicapp-deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload deployment package
+        uses: actions/upload-artifact@v4
+        with:
+          name: logicapp-package
+          path: Apps/Application
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: dev
+
+    steps:
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: logicapp-package
+          path: package
+
+      - name: Replace placeholders in connections
+        env:
+          CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
+        run: |
+          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+
+      - name: Repack package
+        run: |
+          cd package
+          zip -r ../logicapp.zip .
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Deploy to Logic App Standard
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az functionapp deployment source config-zip \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ secrets.LOGICAPP_NAME }}" \
+              --src "${{ github.workspace }}/logicapp.zip"
+
+  deploy-test:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: tst
+
+    steps:
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: logicapp-package
+          path: package
+
+      - name: Replace placeholders in connections
+        env:
+          CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
+        run: |
+          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+
+      - name: Repack package
+        run: |
+          cd package
+          zip -r ../logicapp.zip .
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Deploy to Logic App Standard
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az functionapp deployment source config-zip \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ secrets.LOGICAPP_NAME }}" \
+              --src "${{ github.workspace }}/logicapp.zip"
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: prd
+
+    steps:
+      - name: Download deployment package
+        uses: actions/download-artifact@v4
+        with:
+          name: logicapp-package
+          path: package
+
+      - name: Replace placeholders in connections
+        env:
+          CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
+        run: |
+          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+
+      - name: Repack package
+        run: |
+          cd package
+          zip -r ../logicapp.zip .
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+
+      - name: Deploy to Logic App Standard
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az functionapp deployment source config-zip \
+              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ secrets.LOGICAPP_NAME }}" \
+              --src "${{ github.workspace }}/logicapp.zip"

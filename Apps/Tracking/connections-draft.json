@@ -1,0 +1,130 @@
+{
+  "managedApiConnections": {
+    "servicebus": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-3"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/7fdd98c099c74bccb1cbfdbb41b17d11",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-1": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-4"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/3043b9b2cbc8415bb91e692bcb821ada",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-2": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-2"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/a2d1a08fc3944c89ad9bef4b9cbd427e",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-3": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-5"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/1dfd7f7e4e7346e982632b5a2ce099d9"
+    },
+    "servicebus-4": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-5"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/ab7c4ba73e664390bdb54b8d5d450395",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    }
+  },
+  "serviceProviderConnections": {
+    "eventHub": {
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('eventHub_fullyQualifiedNamespace')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/eventHub"
+      },
+      "displayName": "new_conn_event_hub"
+    },
+    "serviceBus-5": {
+      "parameterValues": {
+        "fullyQualifiedNamespace": "@appsetting('serviceBus_15_fullyQualifiedNamespace')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      },
+      "displayName": "sb-01-tb2bintegation-Application-Euw-Dev"
+    },
+    "AzureBlob": {
+      "parameterValues": {
+        "blobStorageEndpoint": "@appsetting('AzureBlob_blobStorageEndpoint')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/AzureBlob"
+      },
+      "displayName": "st01tb2bdataeuwdev"
+    }
+  },
+  "agentConnections": {}
+}

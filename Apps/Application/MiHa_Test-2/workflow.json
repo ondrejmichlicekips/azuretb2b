@@ -1,0 +1,44 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_an_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "POST"
+        }
+      }
+    },
+    "actions": {
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@body('Transform_XML')"
+        },
+        "runAfter": {
+          "Transform_XML": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Transform_XML": {
+        "type": "Xslt",
+        "inputs": {
+          "content": "@triggerBody()",
+          "map": {
+            "source": "LogicApp",
+            "name": "AZURE_TestMapping.xslt"
+          },
+          "xmlExtensionObject": "<ExtensionObjects>\n  <ExtensionObject Namespace=\"http://schemas.microsoft.com/BizTalk/2003/ScriptNS0\" AssemblyName=\"IntegrationAccountDLL, Version=1.0.0.0, Culture=neutral, PublicKeyToken=d20c02c4bd1ce319\" ClassName=\"IntegrationAccountDLL.Counter\" />\n</ExtensionObjects>"
+        },
+        "runAfter": {}
+      }
+    },
+    "outputs": {}
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "actions": {
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-test-app",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Send_message": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "UpdateContext-copy": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "const contentData = workflowContext.trigger.outputs.body.contentData;\r\n\r\nlet msg = contentData;\r\nif (typeof contentData === 'string' || contentData instanceof String) {\r\n    msg = JSON.parse(contentData);\r\n}\r\n\r\nmsg.Context.Promoted1 = 'Some trace data';\r\nmsg.Context.Promoted2 = 'another text';\r\n\r\nreturn msg;\r\n"
+        },
+        "runAfter": {}
+      },
+      "Send_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "sbq-test-recycle-bin",
+            "message": {
+              "contentData": "@outputs('UpdateContext-copy')"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "sendMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "UpdateContext-copy": [
+            "SUCCEEDED"
+          ]
+        },
+        "trackedProperties": {
+          "InboundTransportType": "SB TEST",
+          "URI": "PUT URI HERE"
+        }
+      }
+    },
+    "outputs": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-test-app"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    }
+  },
+  "kind": "stateful"
+}

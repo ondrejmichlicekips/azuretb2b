@@ -1,0 +1,43 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_an_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http",
+        "inputs": {
+          "method": "POST"
+        }
+      }
+    },
+    "actions": {
+      "Decode_EDIFACT": {
+        "type": "EdifactDecode",
+        "inputs": {
+          "messageToDecode": "@decodeBase64(triggerBody()?['$content'])"
+        },
+        "runAfter": {}
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "headers": {
+            "Content-type": "application/xml"
+          },
+          "body": "@{decodeBase64(body('Decode_EDIFACT')?['interchange']?['functionalGroups'][0]?['transactionSets'][0]?['transactionSetContent']?['$content'])\r\n}\n\n@{body('Decode_EDIFACT')}"
+        },
+        "runAfter": {
+          "Decode_EDIFACT": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

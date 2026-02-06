@@ -1,0 +1,84 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-receiving-from-biztalk"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "Parse_ServiceBus_CustomProperty": {
+        "type": "Compose",
+        "inputs": {
+          "Context": {
+            "CorrelationID": "123456789",
+            "Stage": "OutAzurePOC",
+            "SourceParty": "@triggerBody()?['userProperties']['sourceParty']",
+            "SourcePartyID": null,
+            "DestinationParty": "@triggerBody()?['userProperties']['destinationParty']",
+            "DestinationPartyID": null,
+            "MessageType": "@triggerBody()?['userProperties']['messageType']"
+          },
+          "Body": "@base64(triggerBody()?['contentData'])"
+        },
+        "runAfter": {}
+      },
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-receiving-from-biztalk",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Send_message": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Send_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "sbq-routing",
+            "message": {
+              "contentData": "@outputs('Parse_ServiceBus_CustomProperty')",
+              "contentType": "application/json",
+              "userProperties": "@triggerBody()?['userProperties']"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "sendMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Parse_ServiceBus_CustomProperty": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  }
+}

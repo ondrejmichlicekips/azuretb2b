@@ -1,0 +1,159 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_events_are_available_in_Event_hub": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "eventHubName": "opman"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "eventHub",
+            "operationId": "receiveEvents",
+            "serviceProviderId": "/serviceProviders/eventHub"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "Execute_JavaScript_code": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "const content = workflowContext.trigger.outputs.body.contentData;\r\nconst data = JSON.parse(content);\r\n\r\nlet output = [];\r\nfor (const record of data.records) {\r\n    let operationName = record.operationName;\r\n    let uri = record.uri;\r\n    let uriParts = record.uri.split('/');\r\n    let messageId = uriParts[uriParts.length-1];\r\n\r\n    if (operationName == \"PutBlob\") {\r\n        output.push( \r\n            {operationName, messageId, uri} );\r\n    }\r\n}\r\n\r\nreturn output;"
+        },
+        "runAfter": {}
+      },
+      "For_each_Blob_event": {
+        "type": "Foreach",
+        "foreach": "@outputs('Execute_JavaScript_code')",
+        "actions": {
+          "Parse_JSON": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "@items('For_each_Blob_event')",
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "operationName": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "Condition_Only_PutBlob_on_Messages": {
+            "type": "If",
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "@body('Parse_JSON')?['operationName']",
+                    "PutBlob"
+                  ]
+                },
+                {
+                  "contains": [
+                    "@body('Parse_JSON')?['uri']",
+                    "messages"
+                  ]
+                }
+              ]
+            },
+            "actions": {
+              "Send_message": {
+                "type": "ServiceProvider",
+                "inputs": {
+                  "parameters": {
+                    "entityName": "sbq-test-opman-events",
+                    "message": {
+                      "contentData": "@outputs('Execute_JavaScript_-_create_OpMan_Event')"
+                    }
+                  },
+                  "serviceProviderConfiguration": {
+                    "connectionName": "serviceBus-5",
+                    "operationId": "sendMessage",
+                    "serviceProviderId": "/serviceProviders/serviceBus"
+                  }
+                },
+                "runAfter": {
+                  "Upload_Event_to_blob_storage_": [
+                    "SUCCEEDED"
+                  ]
+                }
+              },
+              "Read_blob_content": {
+                "type": "ServiceProvider",
+                "inputs": {
+                  "parameters": {
+                    "containerName": "messages",
+                    "blobName": "@body('Parse_JSON')?['messageId']"
+                  },
+                  "serviceProviderConfiguration": {
+                    "connectionName": "AzureBlob",
+                    "operationId": "readBlob",
+                    "serviceProviderId": "/serviceProviders/AzureBlob"
+                  }
+                }
+              },
+              "Execute_JavaScript_-_create_OpMan_Event": {
+                "type": "JavaScriptCode",
+                "inputs": {
+                  "code": "function escapeXml(unsafe) {\r\n    return unsafe.replace(/[<>&'\"]/g, function (c) {\r\n        switch (c) {\r\n            case '<': return '&lt;';\r\n            case '>': return '&gt;';\r\n            case '&': return '&amp;';\r\n            case '\\'': return '&apos;';\r\n            case '\"': return '&quot;';\r\n        }\r\n    });\r\n}\r\n\r\nconst content = workflowContext.actions.Read_blob_content.outputs.body.content;\r\n//const context  = JSON.parse(content);\r\nconst context  = content;\r\n\r\nlet msgTime = new Date().toISOString();\r\n\r\nlet inMsg = \"\";\r\nif (context.ParentId) {\r\n  let inProperties = `<Properties> `\r\n      + `  <Property name=\"MessageID\" value=\"${context.ParentId}\" />`\r\n      + `</Properties>`;\r\n  let inAttr = `type=\"${context.MessageType}\" uid=\"${context.ParentId}\" status=\"0\" date=\"${msgTime}\"`;\r\n  inMsg = `<IncommingMessage ${inAttr}> ${inProperties} </IncommingMessage>`;\r\n}\r\n\r\n\r\nlet outProperties = \"\";\r\nfor(var key in context){\r\n    let value = escapeXml(context[key]);\r\n    outProperties += `<Property name=\"${key}\" value=\"${value}\" />`; \r\n}\r\noutProperties = `<Properties> ${outProperties} </Properties>`\r\n\r\nlet outAttr = `type=\"${context.MessageType}\" uid=\"${context.MessageId}\" status=\"0\" date=\"${msgTime}\"`;\r\nlet outMsg = `<OutgoingMessage ${outAttr}> ${outProperties} </OutgoingMessage>`;\r\n\r\n\r\nconst xmlns = 'xmlns:msdata=\"urn:schemas-microsoft-com:xml-msdata\" '\r\n    + ' xmlns:b=\"http://schemas.microsoft.com/BizTalk/2003\" '\r\n    + ' xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" '\r\n    + ' xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" '\r\n    + ' xsi:schemaLocation=\"http://tempuri.org/MessageSchema.xsd  '\r\n    + ' c:\\\\Projects\\\\Tests\\\\CodeXS\\Application\\\\ConsoleApp\\\\bin\\\\Debug\\\\EventSchema.xsd\"'\r\n    + ' xmlns=\"http://tempuri.org/MessageSchema.xsd\" ';\r\nlet eventId = context.EventId;\r\n\r\nlet eventTime = context.Date;\r\nlet eventUri = \"uri\";\r\nif (context.URI)\r\n    eventUri = context.URI;\r\nlet description = \"some text\";\r\nlet server = \"NLMNT573\";\r\nlet adapter = \"BizTalkAdapter1\";\r\nlet eventAttr = `uid=\"${eventId}\" type=\"azure\" subType=\"Orchestration\" description=\"${description}\" status=\"0\" uri=\"${eventUri}\" date=\"${eventTime}\" server=\"${server}\" adapter=\"${adapter}\" `;\r\n\r\nlet result = \r\n    `<Event ${xmlns} ${eventAttr}>` \r\n  + `  <IncommingMessages>`\r\n  + `    ${inMsg}`\r\n  + `  </IncommingMessages>`\r\n  + `  <OutgoingMessages>`\r\n  + `    ${outMsg}`\r\n  + `  </OutgoingMessages>`\r\n  + `</Event>` ;\r\n\r\n\r\nreturn result;\r\n"
+                },
+                "runAfter": {
+                  "Read_blob_content": [
+                    "Succeeded"
+                  ]
+                }
+              },
+              "Upload_Event_to_blob_storage_": {
+                "type": "ServiceProvider",
+                "inputs": {
+                  "parameters": {
+                    "blobUri": "events/@{body('Parse_JSON')?['messageId']}",
+                    "content": "@outputs('Execute_JavaScript_-_create_OpMan_Event')"
+                  },
+                  "serviceProviderConfiguration": {
+                    "connectionName": "AzureBlob",
+                    "operationId": "uploadBlobFromUri",
+                    "serviceProviderId": "/serviceProviders/AzureBlob"
+                  }
+                },
+                "runAfter": {
+                  "Execute_JavaScript_-_create_OpMan_Event": [
+                    "Succeeded"
+                  ]
+                }
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {
+              "Parse_JSON": [
+                "Succeeded"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Execute_JavaScript_code": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

@@ -1,0 +1,141 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_an_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    },
+    "actions": {
+      "EventBody": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": ""
+        },
+        "runAfter": {}
+      },
+      "Execute_JavaScript_code": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "\r\nconst output = [];\r\n\r\nconst input = JSON.parse(workflowContext.actions.EventBody.inputs.variables[0].value);\r\nfor (const record of input.records.sort((a,b) => b.time - a.time)) {\r\n    //try {\r\n        if (!record.resourceId)\r\n            continue;\r\n        let parts = record.resourceId.split('/');\r\n        if (parts.length < 4) {\r\n            continue;\r\n        }\r\n\r\n        const subscription = parts[2];\r\n        const resourceGroup = parts[4];\r\n        const appRoleName = record.AppRoleName;\r\n        const operationName = record.Name;\r\n        const category = record.Properties.Category.split('.')[2];\r\n\r\n        // decode escaped string into JSON object\r\n        if (!record.Properties.resource) {\r\n            continue;\r\n        }\r\n        const resource = JSON.parse(record.Properties.resource);\r\n        const runId = resource.runId;\r\n        const workflowName = resource.workflowName;\r\n\r\n        if (category == 'Triggers' \r\n            || operationName == 'Send_message') {\r\n            output.push(\r\n                {subscription, resourceGroup, appRoleName, workflowName, operationName, category, runId });\r\n        }\r\n\r\n    //} catch (e) { }\r\n}\r\nreturn output;"
+        },
+        "runAfter": {
+          "EventBody": [
+            "Succeeded"
+          ]
+        }
+      },
+      "For_each": {
+        "type": "Foreach",
+        "foreach": "",
+        "actions": {
+          "Parse_JSON": {
+            "type": "ParseJson",
+            "inputs": {
+              "content": "",
+              "schema": ""
+            }
+          },
+          "Condition_Trigger_or_Action": {
+            "type": "If",
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "",
+                    ""
+                  ]
+                }
+              ]
+            },
+            "actions": {
+              "Call_Triggers_Histories": {
+                "type": "Http",
+                "inputs": {
+                  "uri": "",
+                  "method": ""
+                }
+              },
+              "GET_URI": {
+                "type": "ParseJson",
+                "inputs": {
+                  "content": "",
+                  "schema": ""
+                },
+                "runAfter": {
+                  "Call_Triggers_Histories": [
+                    "SUCCEEDED"
+                  ]
+                }
+              },
+              "Get_Output": {
+                "type": "Http",
+                "inputs": {
+                  "uri": "",
+                  "method": ""
+                },
+                "runAfter": {
+                  "GET_URI": [
+                    "SUCCEEDED"
+                  ]
+                },
+                "operationOptions": "DisableAsyncPattern"
+              }
+            },
+            "else": {
+              "actions": {
+                "Call_Actions_Histories": {
+                  "type": "Http",
+                  "inputs": {
+                    "uri": "",
+                    "method": ""
+                  }
+                },
+                "GET_action_URI": {
+                  "type": "ParseJson",
+                  "inputs": {
+                    "content": "",
+                    "schema": ""
+                  },
+                  "runAfter": {
+                    "Call_Actions_Histories": [
+                      "SUCCEEDED"
+                    ]
+                  }
+                },
+                "Get_Action_Output": {
+                  "type": "Http",
+                  "inputs": {
+                    "uri": "",
+                    "method": ""
+                  },
+                  "runAfter": {
+                    "GET_action_URI": [
+                      "SUCCEEDED"
+                    ]
+                  },
+                  "operationOptions": "DisableAsyncPattern"
+                }
+              }
+            },
+            "runAfter": {
+              "Parse_JSON": [
+                "SUCCEEDED"
+              ]
+            }
+          }
+        },
+        "runAfter": {
+          "Execute_JavaScript_code": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

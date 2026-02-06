@@ -1,0 +1,229 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "actions": {
+      "MessageContext": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "Context": {
+                "type": "object",
+                "properties": {
+                  "CorrelationId": {
+                    "type": "string"
+                  },
+                  "EventId": {
+                    "type": "string"
+                  },
+                  "MessageId": {
+                    "type": "string"
+                  },
+                  "ParentId": {
+                    "type": "string"
+                  },
+                  "Date": {
+                    "type": "string"
+                  },
+                  "SourceParty": {
+                    "type": "string"
+                  },
+                  "SourcePartyId": {
+                    "type": "string"
+                  },
+                  "DestinationParty": {
+                    "type": "string"
+                  },
+                  "DestinationPartyId": {
+                    "type": "string"
+                  },
+                  "MessageType": {
+                    "type": "string"
+                  },
+                  "Routing": {
+                    "type": "string"
+                  },
+                  "Stage": {
+                    "type": "string"
+                  }
+                }
+              },
+              "Body": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Send_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "@variables('NextQueueName')",
+            "message": {
+              "contentData": "@outputs('UpdateContext')"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "sendMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "UpdateContext": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "NextStage": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "NextStage",
+              "type": "string",
+              "value": "@{body('GetNextStage')?['resultsets'][0][0]['name']}"
+            }
+          ]
+        },
+        "runAfter": {
+          "GetNextStage": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "GetNextStage": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "storedProcedureName": "GetNextStage",
+            "storedProcedureParameters": {
+              "CurrentStage": "@body('MessageContext')?['Context']?['Stage']",
+              "SourceParty": "@body('MessageContext')?['Context']?['SourceParty']",
+              "DestinationParty": "@body('MessageContext')?['Context']?['DestinationParty']",
+              "SourcePartyId": "@body('MessageContext')?['Context']?['SourcePartyId']",
+              "DestinationPartyId": "@body('MessageContext')?['Context']?['DestinationPartyId']",
+              "MessageType": "@body('MessageContext')?['Context']?['MessageType']",
+              "Routing": "@body('MessageContext')?['Context']?['Routing']"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "sql",
+            "operationId": "executeStoredProcedure",
+            "serviceProviderId": "/serviceProviders/sql"
+          }
+        },
+        "runAfter": {
+          "MessageContext": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-routing",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Send_message": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "UpdateContext": {
+        "type": "JavaScriptCode",
+        "inputs": {
+          "code": "const nextStage = workflowContext.actions.NextStage.inputs.variables[0].value;\r\nconst messageId = workflowContext.actions.MessageId.inputs.variables[0].value;\r\nconst contentData = workflowContext.trigger.outputs.body.contentData;\r\n\r\nlet msg = contentData;\r\nif (typeof contentData === 'string' || contentData instanceof String) {\r\n    msg = JSON.parse(contentData);\r\n}\r\n\r\nlet d = new Date();\r\nmsg.Context.Date = d.toISOString();\r\nmsg.Context.EventId = workflowContext.actions.Eventid.inputs.variables[0].value;\r\nmsg.Context.ParentId = msg.Context.MessageId;\r\nmsg.Context.MessageId = messageId;\r\nmsg.Context.Stage = nextStage;\r\n\r\nreturn msg;\r\n"
+        },
+        "runAfter": {
+          "MessageId": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "NextQueueName": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "NextQueueName",
+              "type": "string",
+              "value": "@{body('GetNextStage')?['resultsets'][0][0]['queue']}"
+            }
+          ]
+        },
+        "runAfter": {
+          "NextStage": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "EventId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "EventId",
+              "type": "string",
+              "value": "@{guid()}"
+            }
+          ]
+        },
+        "runAfter": {
+          "NextQueueName": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "MessageId": {
+        "type": "InitializeVariable",
+        "inputs": {
+          "variables": [
+            {
+              "name": "MessageId",
+              "type": "string",
+              "value": "@{guid()}"
+            }
+          ]
+        },
+        "runAfter": {
+          "EventId": [
+            "SUCCEEDED"
+          ]
+        }
+      }
+    },
+    "outputs": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "description": "",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-routing"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    }
+  },
+  "kind": "stateful"
+}

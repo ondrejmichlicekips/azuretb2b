@@ -1,0 +1,96 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_an_HTTP_request_is_received": {
+        "type": "Request",
+        "kind": "Http"
+      }
+    },
+    "actions": {
+      "Parse_ServiceBus_CustomProperty": {
+        "type": "Compose",
+        "inputs": "@coalesce(triggerBody()?['userProperties']?['myCustomProperty'], triggerBody()?['message']?['applicationProperties']?['myCustomProperty'], triggerBody()?['properties']?['myCustomProperty'])",
+        "runAfter": {
+          "Get_secret": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Get_secret": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "secretName": "asdfasdf"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "keyVault",
+            "operationId": "getSecret",
+            "serviceProviderId": "/serviceProviders/keyVault"
+          }
+        },
+        "runAfter": {
+          "Execute_query": [
+            "Succeeded"
+          ]
+        },
+        "runtimeConfiguration": {
+          "secureData": {
+            "properties": [
+              "inputs",
+              "outputs"
+            ]
+          }
+        }
+      },
+      "Execute_query": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "query": "select ac.[url], ac.[user_name]\nfrom [dbo].[azure_communications] ac\nwhere ac.sender = 'MIHA_TEST' and ac.receiver = '#COR_US'"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "sql",
+            "operationId": "executeQuery",
+            "serviceProviderId": "/serviceProviders/sql"
+          }
+        },
+        "runAfter": {
+          "Compose_Xml_To_Json": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Response": {
+        "type": "Response",
+        "kind": "Http",
+        "inputs": {
+          "statusCode": 200,
+          "body": "@outputs('Compose_Xml_To_Json')"
+        },
+        "runAfter": {
+          "Parse_ServiceBus_CustomProperty": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Compose_Xml_To_Json": {
+        "type": "Compose",
+        "inputs": "@json(xml(outputs('Compose_Remove_ns')))",
+        "runAfter": {
+          "Compose_Remove_ns": [
+            "SUCCEEDED"
+          ]
+        }
+      },
+      "Compose_Remove_ns": {
+        "type": "Compose",
+        "inputs": "@replace(\r\n  replace(\r\n    replace(\r\n      replace(\r\n        string(triggerBody()),\r\n        'ns0:',\r\n        ''\r\n      ),\r\n      'common:',\r\n      ''\r\n    ),\r\n    'ifs:',\r\n    ''\r\n  ),\r\n  '@',\r\n  ''\r\n)",
+        "runAfter": {}
+      }
+    },
+    "outputs": {}
+  }
+}

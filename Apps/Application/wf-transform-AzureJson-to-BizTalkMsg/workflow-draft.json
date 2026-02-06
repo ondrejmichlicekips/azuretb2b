@@ -1,0 +1,198 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {},
+    "triggers": {
+      "When_messages_are_available_in_a_queue_(peek-lock)": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-json-to-xml-transform"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "peekLockQueueMessagesV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "splitOn": "@triggerOutputs()?['body']"
+      }
+    },
+    "actions": {
+      "Compose_XML_with_schema": {
+        "type": "XmlCompose",
+        "inputs": {
+          "schema": {
+            "source": "LogicApp",
+            "name": "AZURE_AzureToBiztalk_3.xsd"
+          },
+          "content": {
+            "Header": {
+              "Sender": "@body('Parse_JSON')?['Context']?['SourceParty']",
+              "SenderID": "@body('Parse_JSON')?['Context']?['SourcePartyID']",
+              "Receiver": "@replace(replace(body('Parse_JSON')?['Context']?['DestinationParty'],'#',''),'_','')",
+              "ReceiverID": "@body('Parse_JSON')?['Context']?['DestinationPartyID']",
+              "DocumentID": "@body('Parse_JSON')?['Context']?['DocumentID']",
+              "CorrelationID": "asdf",
+              "HTTPCode": "@body('Parse_JSON')?['HTTPResponseCode']"
+            },
+            "Body": "<![CDATA[@{body('Parse_JSON')?['Body']}]>"
+          }
+        },
+        "runAfter": {
+          "Parse_JSON": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Send_message": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "entityName": "sbq-sending-to-biztalk",
+            "message": {
+              "contentData": "@body('Compose_XML_with_schema')?['xml']",
+              "contentType": "application/xml"
+            }
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "sendMessage",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Compose_XML_with_schema": [
+            "Succeeded"
+          ]
+        }
+      },
+      "Parse_JSON": {
+        "type": "ParseJson",
+        "inputs": {
+          "content": "@triggerBody()?['contentData']",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "dataType": {
+                "type": "string"
+              },
+              "Context": {
+                "type": "object",
+                "properties": {
+                  "CorrelationID": {
+                    "type": "string"
+                  },
+                  "SourceParty": {
+                    "type": "string"
+                  },
+                  "SourcePartyID": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "DestinationParty": {
+                    "type": "string"
+                  },
+                  "DestinationPartyID": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "DocumentID": {
+                    "type": "string"
+                  },
+                  "SenderAddress": {
+                    "type": "string"
+                  },
+                  "MessageType": {
+                    "type": "string"
+                  },
+                  "Stage": {
+                    "type": "string"
+                  },
+                  "RoutingKey": {
+                    "type": "string"
+                  },
+                  "MQSend": {
+                    "type": "object",
+                    "properties": {
+                      "QueueName": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "HttpSend": {
+                    "type": "object",
+                    "properties": {
+                      "URL": {
+                        "type": "string"
+                      },
+                      "OAuthRequested": {
+                        "type": "boolean"
+                      },
+                      "BasicAuth": {
+                        "type": "object",
+                        "properties": {
+                          "UserName": {
+                            "type": "string"
+                          },
+                          "Password": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "ResponseNeeded": {
+                        "type": "boolean"
+                      },
+                      "RetryInterval": {
+                        "type": "integer"
+                      },
+                      "RetryCount": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "body": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "HTTPResponseCode": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "runAfter": {}
+      },
+      "Complete_the_message_in_a_queue": {
+        "type": "ServiceProvider",
+        "inputs": {
+          "parameters": {
+            "queueName": "sbq-json-to-xml-transform",
+            "lockToken": "@triggerBody()?['lockToken']"
+          },
+          "serviceProviderConfiguration": {
+            "connectionName": "serviceBus",
+            "operationId": "completeQueueMessageV2",
+            "serviceProviderId": "/serviceProviders/serviceBus"
+          }
+        },
+        "runAfter": {
+          "Send_message": [
+            "Succeeded"
+          ]
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "kind": "stateful"
+}

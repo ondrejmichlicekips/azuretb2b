@@ -1,0 +1,133 @@
+{
+  "managedApiConnections": {
+    "sql-1": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/sql"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/sql"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/sql/80344757df114aeaa10cc3c38b9be64b",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://database.windows.net/"
+        }
+      }
+    },
+    "servicebus-1": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-1"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/2cb861bb6e9d45fba9ebbdb108e9b178",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-2": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-2"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/d1afa09f06e345b493a998bbd201d7cf",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-3": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-3"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/7fdd98c099c74bccb1cbfdbb41b17d11",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    },
+    "servicebus-4": {
+      "api": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/providers/Microsoft.Web/locations/westeurope/managedApis/servicebus"
+      },
+      "connection": {
+        "id": "/subscriptions/c6854edc-ccfa-41c7-9326-62d3de261f4a/resourceGroups/rg01tb2bintegationEuwDev/providers/Microsoft.Web/connections/servicebus-4"
+      },
+      "authentication": {
+        "type": "ManagedServiceIdentity"
+      },
+      "connectionRuntimeUrl": "https://1188ac7f5c3c2973.15.common.logic-westeurope.azure-apihub.net/apim/servicebus/3043b9b2cbc8415bb91e692bcb821ada",
+      "connectionProperties": {
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://servicebus.azure.net"
+        }
+      }
+    }
+  },
+  "serviceProviderConnections": {
+    "serviceBus": {
+      "displayName": "sb-01-tb2bintegation-Application-Euw-Dev",
+      "parameterSetName": "ManagedServiceIdentity",
+      "parameterValues": {
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        },
+        "fullyQualifiedNamespace": "@appsetting('serviceBus_fullyQualifiedNamespace')"
+      },
+      "serviceProvider": {
+        "id": "/serviceProviders/serviceBus"
+      }
+    },
+    "keyVault": {
+      "parameterValues": {
+        "VaultUri": "@appsetting('keyVault_VaultUri')",
+        "authProvider": {
+          "Type": "ManagedServiceIdentity"
+        }
+      },
+      "parameterSetName": "ManagedServiceIdentity",
+      "serviceProvider": {
+        "id": "/serviceProviders/keyVault"
+      },
+      "displayName": "new_conn_3e4e4"
+    },
+    "sql": {
+      "parameterValues": {
+        "connectionString": "@appsetting('sql_connectionString')"
+      },
+      "parameterSetName": "connectionString",
+      "serviceProvider": {
+        "id": "/serviceProviders/sql"
+      },
+      "displayName": "new_conn_d7aad"
+    }
+  },
+  "agentConnections": {}
+}
