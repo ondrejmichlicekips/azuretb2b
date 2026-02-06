@@ -44,8 +44,8 @@ jobs:
 
       - name: Repack package
         run: |
-          cd package
-          zip -r ../logicapp.zip .
+          Compress-Archive -Path "package\*" -DestinationPath "logicapp.zip" -Force
+        shell: powershell
 
       - name: Azure Login
         uses: azure/login@v2
@@ -85,8 +85,8 @@ jobs:
 
       - name: Repack package
         run: |
-          cd package
-          zip -r ../logicapp.zip .
+          Compress-Archive -Path "package\*" -DestinationPath "logicapp.zip" -Force
+        shell: powershell
 
       - name: Azure Login
         uses: azure/login@v2
@@ -126,8 +126,8 @@ jobs:
 
       - name: Repack package
         run: |
-          cd package
-          zip -r ../logicapp.zip .
+          Compress-Archive -Path "package\*" -DestinationPath "logicapp.zip" -Force
+        shell: powershell
 
       - name: Azure Login
         uses: azure/login@v2
