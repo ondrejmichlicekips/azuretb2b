@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: [self-hosted, windows]
 
     steps:
       - name: Checkout
@@ -24,7 +24,7 @@ jobs:
           path: Apps/Application
 
   deploy-dev:
-    runs-on: self-hosted
+    runs-on: [self-hosted, windows]
     needs: build
     environment: dev
 
@@ -39,9 +39,8 @@ jobs:
         env:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
-          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+          .\.github\scripts\replace-connections.ps1 -ConnectionsPath "package\connections.json"
         shell: powershell
-
 
       - name: Repack package
         run: |
@@ -66,7 +65,7 @@ jobs:
               --src "${{ github.workspace }}/logicapp.zip"
 
   deploy-test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, windows]
     needs: deploy-dev
     environment: tst
 
@@ -81,7 +80,7 @@ jobs:
         env:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
-          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+          .\.github\scripts\replace-connections.ps1 -ConnectionsPath "package\connections.json"
         shell: powershell
 
       - name: Repack package
@@ -107,7 +106,7 @@ jobs:
               --src "${{ github.workspace }}/logicapp.zip"
 
   deploy-prod:
-    runs-on: self-hosted
+    runs-on: [self-hosted, windows]
     needs: deploy-test
     environment: prd
 
@@ -122,7 +121,7 @@ jobs:
         env:
           CONNECTIONS_PLACEHOLDER_JSON: ${{ secrets.CONNECTIONS_PLACEHOLDER_JSON }}
         run: |
-          pwsh -File .github/scripts/replace-connections.ps1 -ConnectionsPath "package/connections.json"
+          .\.github\scripts\replace-connections.ps1 -ConnectionsPath "package\connections.json"
         shell: powershell
 
       - name: Repack package
