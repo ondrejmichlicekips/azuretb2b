@@ -1,5 +1,9 @@
 name: Deploy Logic App Standard
 
+permissions:
+  id-token: write
+  contents: read
+
 on:
   push:
     branches:
